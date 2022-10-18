@@ -2,15 +2,26 @@
 #include <PubSubClient.h>  
 #include "WiFi.h"
 
-
 /////////////////////////////////////////////////////////////////////////// Funktionsprototypen
 void loop                       ();
 void wifi_setup                 ();
 void callback                   (char* topic, byte* payload, unsigned int length);
-void reconnect                       ();
+void reconnect                  ();
+void messen_strom               ();
+void messen_spannung            ();
+
+/////////////////////////////////////////////////////////////////////////// Systemvariable
+float max_V_solar = 95; // Maximale Stringspannung zum messen
+
+/////////////////////////////////////////////////////////////////////////// Schleifen verwalten
+unsigned long previousMillis_Spannung_messen = 0; // Spannung Messen
+unsigned long interval_Spannung_messen = 1500; 
+
+unsigned long previousMillis_Strom_messen = 0; // Strom Messen
+unsigned long interval_Strom_messen = 2500; 
 
 /////////////////////////////////////////////////////////////////////////// Kartendaten 
-const char* kartenID = "24Relaiskarte_Wohnzimmer";
+const char* kartenID = "Solarmodul_001";
 
 /////////////////////////////////////////////////////////////////////////// MQTT 
 WiFiClient espClient;
@@ -26,7 +37,7 @@ const char* WIFI_SSID = "GuggenbergerLinux";
 const char* WIFI_PASS = "Isabelle2014samira";
 
 // Static IP
-IPAddress local_IP(192, 168, 13, 55);
+IPAddress local_IP(192, 168, 13, 51);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 0, 0, 0);  
 IPAddress dns(192, 168, 1, 1); 
@@ -110,6 +121,20 @@ void callback(char* topic, byte* payload, unsigned int length) {
   
 }
 
+/////////////////////////////////////////////////////////////////////////// Messen Strom
+void messen_strom() {
+// Strom per Shunt messen 
+  client.publish("Solarpanel/001/strom/", "Strom");
+
+}
+
+/////////////////////////////////////////////////////////////////////////// Messen Spannung
+void messen_spannung() {
+// Spannung über Spannungsteiler messen. Maximal U max_V_solar
+  client.publish("Solarpanel/001/spannung/", "Spannung");
+
+
+}
 
 /////////////////////////////////////////////////////////////////////////// SETUP
 void setup() {
@@ -135,11 +160,28 @@ void loop() {
   }
   client.loop();
 
+  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ Spannung messen
+  if (millis() - previousMillis_Spannung_messen > interval_Spannung_messen) {
+      previousMillis_Spannung_messen = millis(); 
+      // Prüfen der Panelenspannung
+      Serial.println("Panele Spannung messen");
+      messen_spannung();
+    }
+
+  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ Strom messen
+  if (millis() - previousMillis_Strom_messen > interval_Strom_messen) {
+      previousMillis_Strom_messen = millis(); 
+      // Prüfen der Stromabgabe
+      Serial.println("Panele Strom messen");
+      messen_strom();
+    }
+
+/*
   // mqtt Testnachricht senden
   client.publish("Solarpanel/001/", "test");
 
   Serial.print("Millis Loop : ");
   Serial.println(millis());
+*/
 
-delay(500);
 }

@@ -13,6 +13,15 @@ void messen_spannung            ();
 /////////////////////////////////////////////////////////////////////////// Systemvariable
 float max_V_solar = 95; // Maximale Stringspannung zum messen
 
+/////////////////////////////////////////////////////////////////////////// ADC Variablen
+const int adc_V = 34; //ADC1_6 - FSpannungsteiler bis 100V 
+const int adc_A = 35; //ADC1_7 - Stromshunt 
+int vINdig      = 49; // 1 Volt entspricht ca. 49 Dig 
+
+/////////////////////////////////////////////////////////////////////////// Systemvariablen setzen
+int adc_sensor_V, adc_sensor_A;
+int ausgabe_volt;
+
 /////////////////////////////////////////////////////////////////////////// Schleifen verwalten
 unsigned long previousMillis_Spannung_messen = 0; // Spannung Messen
 unsigned long interval_Spannung_messen = 1500; 
@@ -124,15 +133,27 @@ void callback(char* topic, byte* payload, unsigned int length) {
 /////////////////////////////////////////////////////////////////////////// Messen Strom
 void messen_strom() {
 // Strom per Shunt messen 
-  client.publish("Solarpanel/001/strom/", "Strom");
+  //client.publish("Solarpanel/001/strom/", "Strom");
 
 }
 
 /////////////////////////////////////////////////////////////////////////// Messen Spannung
 void messen_spannung() {
-// Spannung über Spannungsteiler messen. Maximal U max_V_solar
-  client.publish("Solarpanel/001/spannung/", "Spannung");
+  // Spannung über Spannungsteiler messen. Maximal U max_V_solar
+  /*
+  Mindesspannung  3V
+  Maximalspannung 100V
+  1V entspricht ca 49 Digs
 
+  */
+  adc_sensor_V = analogRead(adc_V); 
+  //client.publish("Solarpanel/001/spannung/", "Spannung");
+  Serial.print("ADC Volt Bit : ");
+  Serial.println(adc_sensor_V);
+  ausgabe_volt = adc_sensor_V / vINdig ;
+
+    Serial.print("ADC Volt : ");
+  Serial.println(ausgabe_volt);
 
 }
 
@@ -173,7 +194,7 @@ void loop() {
       previousMillis_Strom_messen = millis(); 
       // Prüfen der Stromabgabe
       Serial.println("Panele Strom messen");
-      messen_strom();
+      //messen_strom();
     }
 
 /*

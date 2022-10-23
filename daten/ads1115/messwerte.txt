@@ -1,0 +1,3 @@
+Faktor      Strom       Spannung
+0,5         1           0,4155
+0,5         1,5         4101   

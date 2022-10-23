@@ -1,6 +1,27 @@
 #include <Arduino.h>
 #include <PubSubClient.h>  
 #include "WiFi.h"
+ #include <SPI.h>
+#include <Adafruit_ADS1X15.h> 
+
+/////////////////////////////////////////////////////////////////////////// ADS1115
+Adafruit_ADS1115 ads;
+#define ADS_I2C_ADDR 0x48
+//const float multiplier = 0.01F; // ADS1115-Multiplikator bei einf. Verstärkung
+
+// Strom am Shunt messen
+int adc0;                     // Messwert an Kanal 0 des ADS1115 - Strom
+float Strom_Panel = 0.0;
+float GAIN_faktor_Strom = 0.03125; 
+float umrechnung_faktor_messert_strom = 0.0002;
+
+// Spannung der Panelen messen über Spannungsteiler MAX 100V
+int adc1;                                           // Messwert an Kanal 1 des ADS1115 - Spannung
+float Voltage_Panel                    = 0.0;
+float GAIN_faktor_Spannung              = 0.185;
+int umrechnung_faktor_messert_spannung = 1925;
+
+//SCL an GPIO 22 - SDA an GPIO 21
 
 /////////////////////////////////////////////////////////////////////////// Funktionsprototypen
 void loop                       ();
@@ -16,18 +37,17 @@ float max_V_solar = 95; // Maximale Stringspannung zum messen
 /////////////////////////////////////////////////////////////////////////// ADC Variablen
 const int adc_V = 34; //ADC1_6 - FSpannungsteiler bis 100V 
 const int adc_A = 35; //ADC1_7 - Stromshunt 
-int vINdig      = 49; // 1 Volt entspricht ca. 49 Dig 
 
 /////////////////////////////////////////////////////////////////////////// Systemvariablen setzen
 int adc_sensor_V, adc_sensor_A;
-int ausgabe_volt;
+int ausgabe_volt, ausgabe_ampere;
 
 /////////////////////////////////////////////////////////////////////////// Schleifen verwalten
 unsigned long previousMillis_Spannung_messen = 0; // Spannung Messen
 unsigned long interval_Spannung_messen = 1500; 
 
 unsigned long previousMillis_Strom_messen = 0; // Strom Messen
-unsigned long interval_Strom_messen = 2500; 
+unsigned long interval_Strom_messen = 1500; 
 
 /////////////////////////////////////////////////////////////////////////// Kartendaten 
 const char* kartenID = "Solarmodul_001";
@@ -133,27 +153,35 @@ void callback(char* topic, byte* payload, unsigned int length) {
 /////////////////////////////////////////////////////////////////////////// Messen Strom
 void messen_strom() {
 // Strom per Shunt messen 
-  //client.publish("Solarpanel/001/strom/", "Strom");
+ads.setGain(GAIN_FOUR);
+  //client.publish("Solarpanel/001/spannung/", "Spannung");
+
+   Serial.println("Strom messen ");
+
+int16_t adc0; // 16 bits ADC read of input A0
+adc0 = ads.readADC_SingleEnded(0);
+//Strom_Panel = (adc0 / GAIN_faktor_Strom) / umrechnung_faktor_messert_strom;
+Strom_Panel = (adc0 / GAIN_faktor_Strom) * umrechnung_faktor_messert_strom;
+//Voltage_Panel = adc1;
+
+
+ Serial.print("Strom Panel : ");
+ Serial.println(Strom_Panel);
 
 }
 
 /////////////////////////////////////////////////////////////////////////// Messen Spannung
 void messen_spannung() {
   // Spannung über Spannungsteiler messen. Maximal U max_V_solar
-  /*
-  Mindesspannung  3V
-  Maximalspannung 100V
-  1V entspricht ca 49 Digs
+ads.setGain(GAIN_ONE);
+int16_t adc1; // 16 bits ADC read of input A0
+adc1 = ads.readADC_SingleEnded(1);
+Voltage_Panel = (adc1 / GAIN_faktor_Spannung) / umrechnung_faktor_messert_spannung;
+//Voltage_Panel = adc1;
 
-  */
-  adc_sensor_V = analogRead(adc_V); 
-  //client.publish("Solarpanel/001/spannung/", "Spannung");
-  Serial.print("ADC Volt Bit : ");
-  Serial.println(adc_sensor_V);
-  ausgabe_volt = adc_sensor_V / vINdig ;
 
-    Serial.print("ADC Volt : ");
-  Serial.println(ausgabe_volt);
+ Serial.print("Volt Panel : ");
+ Serial.println(Voltage_Panel);
 
 }
 
@@ -169,6 +197,11 @@ wifi_setup();
 // MQTT Broker
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
+
+// ADS1115 Setup
+  ads.begin(ADS_I2C_ADDR, &Wire);
+  // Werte 1-fach verstärken (ESP32 liefert  max. 3,3V)
+   
 
 }
 
@@ -194,15 +227,8 @@ void loop() {
       previousMillis_Strom_messen = millis(); 
       // Prüfen der Stromabgabe
       Serial.println("Panele Strom messen");
-      //messen_strom();
+      messen_strom();
     }
 
-/*
-  // mqtt Testnachricht senden
-  client.publish("Solarpanel/001/", "test");
-
-  Serial.print("Millis Loop : ");
-  Serial.println(millis());
-*/
 
 }

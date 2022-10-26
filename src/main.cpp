@@ -4,6 +4,10 @@
  #include <SPI.h>
 #include <Adafruit_ADS1X15.h> 
 
+/////////////////////////////////////////////////////////////////////////// mqtt variable
+char msgToPublish[60];
+char stgFromFloat[10];
+
 /////////////////////////////////////////////////////////////////////////// ADS1115
 Adafruit_ADS1115 ads;
 #define ADS_I2C_ADDR 0x48
@@ -44,10 +48,10 @@ int ausgabe_volt, ausgabe_ampere;
 
 /////////////////////////////////////////////////////////////////////////// Schleifen verwalten
 unsigned long previousMillis_Spannung_messen = 0; // Spannung Messen
-unsigned long interval_Spannung_messen = 1500; 
+unsigned long interval_Spannung_messen = 10000; 
 
 unsigned long previousMillis_Strom_messen = 0; // Strom Messen
-unsigned long interval_Strom_messen = 1500; 
+unsigned long interval_Strom_messen = 10000; 
 
 /////////////////////////////////////////////////////////////////////////// Kartendaten 
 const char* kartenID = "Solarmodul_001";
@@ -117,8 +121,8 @@ void reconnect() {
     // Attempt to connect
     if (client.connect(kartenID,"zugang1","43b4134735")) {
       Serial.println("connected");
-////////////////////////////////////////////////////////////////////////////////// SUBSCRIBE Eintraege
-      client.subscribe("relais_licht_wohnzimmer_1_0/IN");
+      ////////////////////////////////////////////////////////////////////////// SUBSCRIBE Eintraege
+      //client.subscribe("relais_licht_wohnzimmer_1_0/IN");
 
     } else {
       Serial.print("failed, rc=");
@@ -132,7 +136,7 @@ void reconnect() {
 
 /////////////////////////////////////////////////////////////////////////// MQTT callback
 void callback(char* topic, byte* payload, unsigned int length) {
-
+/*
   /////////////////////////////////////////////////////////////////////////// Relais 0
       if (strcmp(topic,"relais_licht_wohnzimmer_1_0/IN")==0) {
 
@@ -147,7 +151,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
                 }
         } 
-  
+  */
 }
 
 /////////////////////////////////////////////////////////////////////////// Messen Strom
@@ -161,12 +165,17 @@ ads.setGain(GAIN_FOUR);
 int16_t adc0; // 16 bits ADC read of input A0
 adc0 = ads.readADC_SingleEnded(0);
 //Strom_Panel = (adc0 / GAIN_faktor_Strom) / umrechnung_faktor_messert_strom;
-Strom_Panel = (adc0 / GAIN_faktor_Strom) * umrechnung_faktor_messert_strom;
+Strom_Panel = ((adc0 / GAIN_faktor_Strom) * umrechnung_faktor_messert_strom) * 2;
 //Voltage_Panel = adc1;
 
 
  Serial.print("Strom Panel : ");
  Serial.println(Strom_Panel);
+
+   dtostrf(Strom_Panel, 4, 0, stgFromFloat);
+  sprintf(msgToPublish, "%s", stgFromFloat);
+   Serial.println(msgToPublish);
+  client.publish("Solarpanel/001/strom/", msgToPublish);
 
 }
 
@@ -182,6 +191,14 @@ Voltage_Panel = (adc1 / GAIN_faktor_Spannung) / umrechnung_faktor_messert_spannu
 
  Serial.print("Volt Panel : ");
  Serial.println(Voltage_Panel);
+
+ // mqtt absenden
+
+  dtostrf(Voltage_Panel, 4, 2, stgFromFloat);
+  sprintf(msgToPublish, "%s", stgFromFloat);
+   Serial.println(msgToPublish);
+  client.publish("Solarpanel/001/spannung/", msgToPublish);
+
 
 }
 
@@ -230,5 +247,5 @@ void loop() {
       messen_strom();
     }
 
-
+delay(300);
 }

@@ -8,23 +8,6 @@
 char msgToPublish[60];
 char stgFromFloat[10];
 
-/////////////////////////////////////////////////////////////////////////// ADS1115
-Adafruit_ADS1115 ads;
-#define ADS_I2C_ADDR 0x48
-//const float multiplier = 0.01F; // ADS1115-Multiplikator bei einf. Verstärkung
-
-// Strom am Shunt messen
-int adc0;                     // Messwert an Kanal 0 des ADS1115 - Strom
-float Strom_Panel = 0.0;
-float GAIN_faktor_Strom = 0.03125; 
-float umrechnung_faktor_messert_strom = 0.0002;
-
-// Spannung der Panelen messen über Spannungsteiler MAX 100V
-int adc1;                                           // Messwert an Kanal 1 des ADS1115 - Spannung
-float Voltage_Panel                    = 0.0;
-float GAIN_faktor_Spannung              = 0.185;
-int umrechnung_faktor_messert_spannung = 1925;
-
 //SCL an GPIO 22 - SDA an GPIO 21
 
 /////////////////////////////////////////////////////////////////////////// Funktionsprototypen
@@ -32,26 +15,12 @@ void loop                       ();
 void wifi_setup                 ();
 void callback                   (char* topic, byte* payload, unsigned int length);
 void reconnect                  ();
-void messen_strom               ();
-void messen_spannung            ();
+void messen                     ();
 
-/////////////////////////////////////////////////////////////////////////// Systemvariable
-float max_V_solar = 95; // Maximale Stringspannung zum messen
-
-/////////////////////////////////////////////////////////////////////////// ADC Variablen
-const int adc_V = 34; //ADC1_6 - FSpannungsteiler bis 100V 
-const int adc_A = 35; //ADC1_7 - Stromshunt 
-
-/////////////////////////////////////////////////////////////////////////// Systemvariablen setzen
-int adc_sensor_V, adc_sensor_A;
-int ausgabe_volt, ausgabe_ampere;
 
 /////////////////////////////////////////////////////////////////////////// Schleifen verwalten
-unsigned long previousMillis_Spannung_messen = 0; // Spannung Messen
-unsigned long interval_Spannung_messen = 10000; 
-
-unsigned long previousMillis_Strom_messen = 0; // Strom Messen
-unsigned long interval_Strom_messen = 10000; 
+unsigned long previousMillis_messen = 0; // Spannung Messen
+unsigned long interval_messen = 2000; 
 
 /////////////////////////////////////////////////////////////////////////// Kartendaten 
 const char* kartenID = "Solarmodul_001";
@@ -83,7 +52,6 @@ Serial.println(WIFI_SSID);
 if (!WiFi.config(local_IP, gateway, subnet, dns)) {
    Serial.println("STA fehlerhaft!");
   }
-
 
 // WiFI Modus setzen
 WiFi.mode(WIFI_OFF);
@@ -154,50 +122,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
   */
 }
 
-/////////////////////////////////////////////////////////////////////////// Messen Strom
-void messen_strom() {
-// Strom per Shunt messen 
-ads.setGain(GAIN_FOUR);
-  //client.publish("Solarpanel/001/spannung/", "Spannung");
-
-   Serial.println("Strom messen ");
-
-int16_t adc0; // 16 bits ADC read of input A0
-adc0 = ads.readADC_SingleEnded(0);
-//Strom_Panel = (adc0 / GAIN_faktor_Strom) / umrechnung_faktor_messert_strom;
-Strom_Panel = ((adc0 / GAIN_faktor_Strom) * umrechnung_faktor_messert_strom) * 2;
-//Voltage_Panel = adc1;
-
-
- Serial.print("Strom Panel : ");
- Serial.println(Strom_Panel);
-
-   dtostrf(Strom_Panel, 4, 0, stgFromFloat);
-  sprintf(msgToPublish, "%s", stgFromFloat);
-   Serial.println(msgToPublish);
-  client.publish("Solarpanel/001/strom/", msgToPublish);
-
-}
-
 /////////////////////////////////////////////////////////////////////////// Messen Spannung
 void messen_spannung() {
   // Spannung über Spannungsteiler messen. Maximal U max_V_solar
-ads.setGain(GAIN_ONE);
-int16_t adc1; // 16 bits ADC read of input A0
-adc1 = ads.readADC_SingleEnded(1);
-Voltage_Panel = (adc1 / GAIN_faktor_Spannung) / umrechnung_faktor_messert_spannung;
-//Voltage_Panel = adc1;
-
-
- Serial.print("Volt Panel : ");
- Serial.println(Voltage_Panel);
-
- // mqtt absenden
-
-  dtostrf(Voltage_Panel, 4, 2, stgFromFloat);
-  sprintf(msgToPublish, "%s", stgFromFloat);
-   Serial.println(msgToPublish);
-  client.publish("Solarpanel/001/spannung/", msgToPublish);
 
 
 }
@@ -215,10 +142,7 @@ wifi_setup();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
-// ADS1115 Setup
-  ads.begin(ADS_I2C_ADDR, &Wire);
-  // Werte 1-fach verstärken (ESP32 liefert  max. 3,3V)
-   
+ 
 
 }
 
@@ -232,20 +156,13 @@ void loop() {
   client.loop();
 
   //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ Spannung messen
-  if (millis() - previousMillis_Spannung_messen > interval_Spannung_messen) {
-      previousMillis_Spannung_messen = millis(); 
+  if (millis() - previousMillis_messen > interval_messen) {
+      previousMillis_messen = millis(); 
       // Prüfen der Panelenspannung
-      Serial.println("Panele Spannung messen");
-      messen_spannung();
+      Serial.println("Panele messen");
+      messen();
     }
 
-  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ Strom messen
-  if (millis() - previousMillis_Strom_messen > interval_Strom_messen) {
-      previousMillis_Strom_messen = millis(); 
-      // Prüfen der Stromabgabe
-      Serial.println("Panele Strom messen");
-      messen_strom();
-    }
 
 delay(300);
 }
